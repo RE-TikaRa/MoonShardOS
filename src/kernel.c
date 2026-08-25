@@ -6,6 +6,7 @@
 #include "logo.c"
 #include "console/console.h"
 #include "cpu/gdt.h"
+#include "cpu/idt.h"
 
 /*
 在启动MoonShardOS的时候，需要一个framebuffer。
@@ -79,12 +80,13 @@ void kmain(void)
 
     console_set_color(text_color);
 
+    idt_init();
+
     console_write(
         "MoonShardOS\n"
         "Kernel initialized.\n"
         "Graphics initialized.\n"
     );
-
 
 
     for (;;)

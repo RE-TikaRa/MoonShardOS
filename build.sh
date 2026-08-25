@@ -22,10 +22,13 @@ SOURCES=(
     "src/graphics/font.c"
     "src/console/console.c"
     "src/cpu/gdt.c"
+    "src/cpu/idt.c"
+    "src/cpu/isr.c"
 )
 
 # --- 3. Print Banner ---
 echo -e "${BLUE}"
+
 cat << 'EOF'
 =====================================================================================================
                                                                                                      
@@ -41,39 +44,72 @@ cat << 'EOF'
                                                                                                      
 =====================================================================================================
 EOF
+
 echo -e "${RESET}"
 
 echo -e "${GOLD}${BOLD}${OS_NAME} Kernel Build${RESET}\n"
 
 # --- 4. Build Process ---
 echo -e "${GRAY}[1/4] Compiling kernel sources...${RESET}"
+
 OBJECTS=()
 
 for SRC in "${SOURCES[@]}"; do
     OBJ="${SRC##*/}"
     OBJ="${OBJ%.c}.o"
+
+    # isr.c 和 isr.S 不能共享同一个目标文件名。
+    if [ "$SRC" = "src/cpu/isr.c" ]; then
+        OBJ="isr_handler.o"
+    fi
+
     OBJECTS+=("$OBJ")
 
     echo -e "  ${BLUE}::${RESET} CC ${SRC}"
     gcc $CFLAGS -c "$SRC" -o "$OBJ"
 done
 
+# isr.S 是 CPU 异常入口汇编代码。
+# 它单独编译为 isr.o。
+echo -e "  ${BLUE}::${RESET} AS src/cpu/isr.S"
+
+gcc $CFLAGS \
+    -c src/cpu/isr.S \
+    -o isr.o
+
+OBJECTS+=("isr.o")
+
 echo -e "\n${GRAY}[2/4] Linking kernel...${RESET}"
-ld $LDFLAGS "${OBJECTS[@]}" -o kernel.elf
+
+ld $LDFLAGS \
+    "${OBJECTS[@]}" \
+    -o kernel.elf
 
 echo -e "\n${GRAY}[3/4] Updating ISO structure...${RESET}"
+
 cp kernel.elf iso/boot/kernel.elf
 
 echo -e "\n${GRAY}[4/4] Generating Bootable ISO...${RESET}"
+
 rm -f "${OS_NAME}.iso"
 
-xorriso -as mkisofs -b boot/limine-bios-cd.bin -no-emul-boot -boot-load-size 4 -boot-info-table \
-    --efi-boot boot/BOOTX64.EFI -efi-boot-part --efi-boot-image \
-    -o "${OS_NAME}.iso" iso > /dev/null 2>&1
+xorriso \
+    -as mkisofs \
+    -b boot/limine-bios-cd.bin \
+    -no-emul-boot \
+    -boot-load-size 4 \
+    -boot-info-table \
+    --efi-boot boot/BOOTX64.EFI \
+    -efi-boot-part \
+    --efi-boot-image \
+    -o "${OS_NAME}.iso" \
+    iso > /dev/null 2>&1
 
-limine/limine bios-install "${OS_NAME}.iso" > /dev/null 2>&1
+limine/limine bios-install \
+    "${OS_NAME}.iso" > /dev/null 2>&1
 
 # --- 5. Cleanup & Finish ---
+
 rm -f "${OBJECTS[@]}" kernel.elf
 
 echo -e "\n${GREEN}========================================${RESET}"
@@ -81,7 +117,9 @@ echo -e "${GREEN}${BOLD}      Build successful!${RESET}"
 echo -e "${GREEN}========================================${RESET}\n"
 
 echo -e "${GOLD}ISO Output:${RESET} ${OS_NAME}.iso\n"
+
 echo -e "${GOLD}Run with QEMU:${RESET}"
+
 echo -e "  qemu-system-x86_64 \\"
 echo -e "      -cdrom ${OS_NAME}.iso \\"
 echo -e "      -m 256M \\"
