@@ -5,6 +5,7 @@
 #include "graphics/font.h"
 #include "logo.c"
 #include "console/console.h"
+#include "cpu/gdt.h"
 
 /*
 在启动MoonShardOS的时候，需要一个framebuffer。
@@ -34,6 +35,8 @@ void kmain(void)
 
     struct limine_framebuffer *framebuffer =
         response->framebuffers[0];
+
+    gdt_init();
 
     framebuffer_init(framebuffer);
 

@@ -21,6 +21,7 @@ SOURCES=(
     "src/graphics/image.c"
     "src/graphics/font.c"
     "src/console/console.c"
+    "src/cpu/gdt.c"
 )
 
 # --- 3. Print Banner ---
@@ -52,7 +53,7 @@ for SRC in "${SOURCES[@]}"; do
     OBJ="${SRC##*/}"
     OBJ="${OBJ%.c}.o"
     OBJECTS+=("$OBJ")
-    
+
     echo -e "  ${BLUE}::${RESET} CC ${SRC}"
     gcc $CFLAGS -c "$SRC" -o "$OBJ"
 done
@@ -64,13 +65,13 @@ echo -e "\n${GRAY}[3/4] Updating ISO structure...${RESET}"
 cp kernel.elf iso/boot/kernel.elf
 
 echo -e "\n${GRAY}[4/4] Generating Bootable ISO...${RESET}"
-rm -f ${OS_NAME}.iso
+rm -f "${OS_NAME}.iso"
 
 xorriso -as mkisofs -b boot/limine-bios-cd.bin -no-emul-boot -boot-load-size 4 -boot-info-table \
     --efi-boot boot/BOOTX64.EFI -efi-boot-part --efi-boot-image \
-    -o ${OS_NAME}.iso iso > /dev/null 2>&1
+    -o "${OS_NAME}.iso" iso > /dev/null 2>&1
 
-limine/limine bios-install ${OS_NAME}.iso > /dev/null 2>&1
+limine/limine bios-install "${OS_NAME}.iso" > /dev/null 2>&1
 
 # --- 5. Cleanup & Finish ---
 rm -f "${OBJECTS[@]}" kernel.elf
