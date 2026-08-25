@@ -1,160 +1,87 @@
 #!/bin/bash
-
 set -e
 
+# --- 1. Colors & Styles ---
 BLUE='\033[38;5;24m'
-
 GOLD='\033[38;5;179m'
-
 GRAY='\033[38;5;75m'
-
 GREEN='\033[38;5;114m'
-
+BOLD='\033[1m'
 RESET='\033[0m'
 
-echo
+# --- 2. Build Configurations ---
+OS_NAME="MoonShardOS"
+CFLAGS="-ffreestanding -m64 -mno-red-zone -fno-stack-protector -nostdlib"
+LDFLAGS="-m elf_x86_64 -nostdlib -z max-page-size=0x1000 -T linker.ld"
 
+# Source files array
+SOURCES=(
+    "src/kernel.c"
+    "src/graphics/framebuffer.c"
+    "src/graphics/image.c"
+    "src/graphics/font.c"
+    "src/console/console.c"
+)
+
+# --- 3. Print Banner ---
 echo -e "${BLUE}"
-
-echo "====================================================================================================="
-
-echo "                                                                                                     "
-
-echo "                                                                                                     "
-
-echo "                                                                                                     "
-
-echo "░███     ░███                                    ░██████   ░██                                    ░██ "
-
-echo "░████   ░████                                   ░██   ░██  ░██                                    ░██ "
-
-echo "░██░██ ░██░██  ░███████   ░███████  ░████████  ░██         ░████████   ░██████   ░██░████  ░████████ "
-
-echo "░██ ░████ ░██ ░██    ░██ ░██    ░██ ░██    ░██  ░████████  ░██    ░██       ░██  ░███     ░██    ░██ "
-
-echo "░██  ░██  ░██ ░██    ░██ ░██    ░██ ░██    ░██        ░██  ░██    ░██  ░███████  ░██      ░██    ░██ "
-
-echo "░██       ░██ ░██    ░██ ░██    ░██ ░██    ░██ ░██   ░██   ░██    ░██ ░██   ░██  ░██      ░██   ░███ "
-
-echo "░██       ░██  ░███████   ░███████  ░██    ░██  ░██████    ░██    ░██  ░█████░██ ░██       ░█████░██ "
-
-echo "                                                                                                     "
-
-echo "                                                                                                     "
-
-echo "                                                                                                     "
-
-echo "====================================================================================================="
-
+cat << 'EOF'
+=====================================================================================================
+                                                                                                     
+                                                                                                     
+                                                                                                     
+░███     ░███                                    ░██████   ░██                                    ░██ 
+░████   ░████                                   ░██   ░██  ░██                                    ░██ 
+░██░██ ░██░██  ░███████   ░███████  ░████████  ░██         ░████████   ░██████   ░██░████  ░████████ 
+░██ ░████ ░██ ░██    ░██ ░██    ░██ ░██    ░██  ░████████  ░██    ░██      ░██  ░███      ░██    ░██ 
+░██  ░██  ░██ ░██    ░██ ░██    ░██ ░██    ░██         ░██  ░██    ░██  ░███████  ░██       ░██    ░██ 
+░██       ░██ ░██    ░██ ░██    ░██ ░██    ░██ ░██   ░██   ░██    ░██ ░██   ░██  ░██       ░██   ░███ 
+░██       ░██  ░███████   ░███████  ░██    ░██  ░██████     ░██    ░██  ░█████░██ ░██        ░█████░██ 
+                                                                                                     
+=====================================================================================================
+EOF
 echo -e "${RESET}"
 
-echo -e "${GOLD}MoonShardOS Kernel Build${RESET}"
+echo -e "${GOLD}${BOLD}${OS_NAME} Kernel Build${RESET}\n"
 
-echo
+# --- 4. Build Process ---
+echo -e "${GRAY}[1/4] Compiling kernel sources...${RESET}"
+OBJECTS=()
 
-echo -e "${GRAY}[1/4]${RESET} Compiling kernel..."
+for SRC in "${SOURCES[@]}"; do
+    OBJ="${SRC##*/}"
+    OBJ="${OBJ%.c}.o"
+    OBJECTS+=("$OBJ")
+    
+    echo -e "  ${BLUE}::${RESET} CC ${SRC}"
+    gcc $CFLAGS -c "$SRC" -o "$OBJ"
+done
 
-gcc \
-    -ffreestanding \
-    -m64 \
-    -mno-red-zone \
-    -fno-stack-protector \
-    -nostdlib \
-    -c src/kernel.c \
-    -o kernel.o
+echo -e "\n${GRAY}[2/4] Linking kernel...${RESET}"
+ld $LDFLAGS "${OBJECTS[@]}" -o kernel.elf
 
-gcc \
-    -ffreestanding \
-    -m64 \
-    -mno-red-zone \
-    -fno-stack-protector \
-    -nostdlib \
-    -c src/graphics/framebuffer.c \
-    -o framebuffer.o
-
-gcc \
-    -ffreestanding \
-    -m64 \
-    -mno-red-zone \
-    -fno-stack-protector \
-    -nostdlib \
-    -c src/graphics/image.c \
-    -o image.o
-
-gcc \
-    -ffreestanding \
-    -m64 \
-    -mno-red-zone \
-    -fno-stack-protector \
-    -nostdlib \
-    -c src/graphics/font.c \
-    -o font.o
-
-echo
-
-echo -e "${GRAY}[2/4]${RESET} Linking kernel..."
-
-ld \
-    -m elf_x86_64 \
-    -nostdlib \
-    -z max-page-size=0x1000 \
-    -T linker.ld \
-    kernel.o \
-    framebuffer.o \
-    image.o \
-    font.o \
-    -o kernel.elf
-
-echo
-
-echo -e "${GRAY}[3/4]${RESET} Updating ISO files..."
-
+echo -e "\n${GRAY}[3/4] Updating ISO structure...${RESET}"
 cp kernel.elf iso/boot/kernel.elf
 
-echo
+echo -e "\n${GRAY}[4/4] Generating Bootable ISO...${RESET}"
+rm -f ${OS_NAME}.iso
 
-echo -e "${GRAY}[4/4]${RESET} Building ISO..."
+xorriso -as mkisofs -b boot/limine-bios-cd.bin -no-emul-boot -boot-load-size 4 -boot-info-table \
+    --efi-boot boot/BOOTX64.EFI -efi-boot-part --efi-boot-image \
+    -o ${OS_NAME}.iso iso > /dev/null 2>&1
 
-rm -f MoonShardOS.iso
+limine/limine bios-install ${OS_NAME}.iso > /dev/null 2>&1
 
-xorriso \
-    -as mkisofs \
-    -b boot/limine-bios-cd.bin \
-    -no-emul-boot \
-    -boot-load-size 4 \
-    -boot-info-table \
-    --efi-boot boot/BOOTX64.EFI \
-    -efi-boot-part \
-    --efi-boot-image \
-    -o MoonShardOS.iso \
-    iso
+# --- 5. Cleanup & Finish ---
+rm -f "${OBJECTS[@]}" kernel.elf
 
-limine/limine bios-install MoonShardOS.iso
+echo -e "\n${GREEN}========================================${RESET}"
+echo -e "${GREEN}${BOLD}      Build successful!${RESET}"
+echo -e "${GREEN}========================================${RESET}\n"
 
-echo
-
-echo -e "${GREEN}========================================${RESET}"
-
-echo -e "${GREEN}        Build successful!${RESET}"
-
-echo -e "${GREEN}========================================${RESET}"
-
-echo
-
-echo -e "${GOLD}ISO:${RESET} MoonShardOS.iso"
-
-echo
-
+echo -e "${GOLD}ISO Output:${RESET} ${OS_NAME}.iso\n"
 echo -e "${GOLD}Run with QEMU:${RESET}"
-
-echo
-
-echo "qemu-system-x86_64 \\"
-
-echo "    -cdrom MoonShardOS.iso \\"
-
-echo "    -m 256M \\"
-
-echo "    -vga std"
-
-echo
+echo -e "  qemu-system-x86_64 \\"
+echo -e "      -cdrom ${OS_NAME}.iso \\"
+echo -e "      -m 256M \\"
+echo -e "      -vga std\n"

@@ -3,6 +3,10 @@
 
 #include <stdint.h>
 
+#define FONT_WIDTH 8
+#define FONT_HEIGHT 8
+#define FONT_SPACING 8
+
 void font_draw_char(
     uint64_t x,
     uint64_t y,

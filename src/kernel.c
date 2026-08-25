@@ -4,6 +4,7 @@
 #include "graphics/image.h"
 #include "graphics/font.h"
 #include "logo.c"
+#include "console/console.h"
 
 /*
 在启动MoonShardOS的时候，需要一个framebuffer。
@@ -71,12 +72,17 @@ void kmain(void)
             0x46
         );
 
-    font_draw_string(
-        framebuffer->width / 2 - 45,
-        framebuffer->height / 2 + 150,
-        text_color,
-        "MOON SHARD"
+    console_init();
+
+    console_set_color(text_color);
+
+    console_write(
+        "MoonShardOS\n"
+        "Kernel initialized.\n"
+        "Graphics initialized.\n"
     );
+
+
 
     for (;;)
     {
