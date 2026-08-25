@@ -12,6 +12,7 @@ void image_draw(
     struct limine_framebuffer *framebuffer =
         framebuffer_get();
 
+    /* image 数组是按 y 行、x 列排列的连续像素。 */
     for (uint64_t iy = 0;
          iy < height;
          iy++)
@@ -23,6 +24,7 @@ void image_draw(
             uint64_t target_x = x + ix;
             uint64_t target_y = y + iy;
 
+            /* 图像可以部分位于屏幕外，越界像素不参与绘制。 */
             if (target_x >= framebuffer->width ||
                 target_y >= framebuffer->height)
             {
@@ -37,6 +39,7 @@ void image_draw(
             uint8_t g = (color >> 8) & 0xFF;
             uint8_t b = color & 0xFF;
 
+            /* Alpha 为 0 表示完全透明，保留背景像素。 */
             if (a == 0)
             {
                 continue;
@@ -48,6 +51,11 @@ void image_draw(
                     target_y
                 );
 
+            /*
+             * framebuffer 中的颜色分量是压缩后的 mask 值，
+             * 先提取并恢复到 0~255，才能和图像的 8 位分量使用同一套
+             * Alpha 公式计算。
+             */
             uint8_t old_r =
                 (old >> framebuffer->red_mask_shift) &
                 ((1 << framebuffer->red_mask_size) - 1);
@@ -81,6 +89,7 @@ void image_draw(
             uint8_t final_b =
                 (b * a + old_b * (255 - a)) / 255;
 
+            /* 混合结果重新编码成 framebuffer 的原生像素格式。 */
             framebuffer_put_pixel(
                 target_x,
                 target_y,

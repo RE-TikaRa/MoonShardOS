@@ -464,3 +464,11 @@ core
 *.patch~
 *.save
 *.recover
+
+
+# ------------------------------------------------------------
+# MoonShardOS local tooling
+# ------------------------------------------------------------
+
+# Serena project metadata is generated locally and is not part of the kernel.
+.serena/

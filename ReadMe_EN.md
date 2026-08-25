@@ -26,6 +26,8 @@ MoonShardOS currently provides:
 * Basic Console output
 * Newline and automatic line wrapping
 * GDT initialization
+* IDT initialization
+* Basic entries and handling for CPU exceptions `0~31`
 * ISO image generation
 * QEMU boot support
 
@@ -45,6 +47,8 @@ Image
 Bitmap Font
    ↓
 Console
+   ↓
+IDT / CPU Exceptions
 ```
 
 The startup screen uses a dedicated graphical background, Logo, and title before entering the kernel Console.
@@ -55,8 +59,11 @@ The startup screen uses a dedicated graphical background, Logo, and title before
 MoonShardOS/
 ├── iso/                 # ISO filesystem
 ├── limine/              # Limine bootloader submodule
+├── assets/
+│   └── logo.png         # Logo source image
 ├── src/
 │   ├── kernel.c         # Kernel entry
+│   ├── logo.c            # Static pixel array generated from logo.png
 │   ├── graphics/
 │   │   ├── framebuffer.c
 │   │   ├── framebuffer.h
@@ -69,9 +76,15 @@ MoonShardOS/
 │   │   └── console.h
 │   └── cpu/
 │       ├── gdt.c
-│       └── gdt.h
+│       ├── gdt.h
+│       ├── idt.c
+│       ├── idt.h
+│       ├── isr.c
+│       └── isr.S
 ├── build.sh             # Build script
+├── tools/png2c.py       # PNG-to-C pixel conversion tool
 ├── linker.ld            # Kernel linker script
+├── .gitignore
 └── .gitmodules
 ```
 
@@ -177,7 +190,7 @@ The Console will gradually become the system terminal and provide the text outpu
 
 ## CPU
 
-A basic GDT has now been added.
+A basic GDT, IDT, and CPU exception path are now included.
 
 The current GDT contains:
 
@@ -204,9 +217,15 @@ kmain()
 gdt_init()
    ↓
 framebuffer_init()
+   ↓
+console_init()
+   ↓
+idt_init()
 ```
 
-The next stage is IDT and CPU exception handling.
+The IDT currently installs the CPU-reserved vectors `0~31`. `src/cpu/isr.S` adds a zero error code where the CPU does not provide one, saves the vector, error code, and general-purpose registers, and calls the C handler in `src/cpu/isr.c`.
+
+For a Page Fault, `CR2` provides the linear address that caused the exception. The current handler prints a diagnostic message and stops in a `hlt` loop; hardware interrupts, timers, and the TSS are not configured yet.
 
 ## Architecture Direction
 
@@ -261,6 +280,12 @@ qemu-system-x86_64 \
     -vga std
 ```
 
+After changing the Logo source image, regenerate the static pixel array with:
+
+```bash
+python3 tools/png2c.py assets/logo.png src/logo.c
+```
+
 ## Roadmap
 
 ### Boot and Graphics
@@ -287,8 +312,8 @@ qemu-system-x86_64 \
 ### CPU
 
 * [x] GDT
-* [ ] IDT
-* [ ] CPU exception handling
+* [x] IDT
+* [x] CPU exception handling
 * [ ] Interrupt handling
 * [ ] Timer
 * [ ] TSS

@@ -1,7 +1,9 @@
 #!/bin/bash
+
+# 任一步骤失败都停止，避免把不完整的 kernel.elf 继续打进 ISO。
 set -e
 
-# --- 1. Colors & Styles ---
+# 构建输出使用固定颜色，便于在长日志中区分阶段和文件名。
 BLUE='\033[38;5;24m'
 GOLD='\033[38;5;179m'
 GRAY='\033[38;5;75m'
@@ -9,12 +11,14 @@ GREEN='\033[38;5;114m'
 BOLD='\033[1m'
 RESET='\033[0m'
 
-# --- 2. Build Configurations ---
+# 内核是 freestanding 程序，不链接宿主机 C 运行时，也不使用红区。
+# -mno-red-zone 对中断/异常路径很重要，因为 CPU 可能在异步入口中覆盖
+# 普通用户态代码会使用、但内核异常处理不能假定安全的栈下方区域。
 OS_NAME="MoonShardOS"
 CFLAGS="-ffreestanding -m64 -mno-red-zone -fno-stack-protector -nostdlib"
 LDFLAGS="-m elf_x86_64 -nostdlib -z max-page-size=0x1000 -T linker.ld"
 
-# Source files array
+# C 源文件按模块列出；汇编异常入口在下方单独编译。
 SOURCES=(
     "src/kernel.c"
     "src/graphics/framebuffer.c"
@@ -26,7 +30,7 @@ SOURCES=(
     "src/cpu/isr.c"
 )
 
-# --- 3. Print Banner ---
+# 打印项目横幅，不参与构建结果。
 echo -e "${BLUE}"
 
 cat << 'EOF'
@@ -49,7 +53,7 @@ echo -e "${RESET}"
 
 echo -e "${GOLD}${BOLD}${OS_NAME} Kernel Build${RESET}\n"
 
-# --- 4. Build Process ---
+# 先把每个源文件编译成目标文件，再统一交给 ld 链接。
 echo -e "${GRAY}[1/4] Compiling kernel sources...${RESET}"
 
 OBJECTS=()
@@ -58,7 +62,7 @@ for SRC in "${SOURCES[@]}"; do
     OBJ="${SRC##*/}"
     OBJ="${OBJ%.c}.o"
 
-    # isr.c 和 isr.S 不能共享同一个目标文件名。
+    # isr.c 和 isr.S 的默认文件名都会得到 isr.o，必须给 C 处理器改名。
     if [ "$SRC" = "src/cpu/isr.c" ]; then
         OBJ="isr_handler.o"
     fi
@@ -69,8 +73,8 @@ for SRC in "${SOURCES[@]}"; do
     gcc $CFLAGS -c "$SRC" -o "$OBJ"
 done
 
-# isr.S 是 CPU 异常入口汇编代码。
-# 它单独编译为 isr.o。
+# isr.S 是 CPU 异常入口汇编代码，单独保留为 isr.o，
+# 这样可以和改名后的 isr_handler.o 同时参与链接。
 echo -e "  ${BLUE}::${RESET} AS src/cpu/isr.S"
 
 gcc $CFLAGS \
@@ -108,7 +112,7 @@ xorriso \
 limine/limine bios-install \
     "${OS_NAME}.iso" > /dev/null 2>&1
 
-# --- 5. Cleanup & Finish ---
+# 目标文件和中间 ELF 只服务于本次 ISO 生成，最终保留 ISO 文件。
 
 rm -f "${OBJECTS[@]}" kernel.elf
 

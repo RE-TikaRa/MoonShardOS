@@ -25,6 +25,8 @@ MoonShardOS 是一个面向 `x86_64` 的实验性操作系统项目，使用 C �
 * Console 基础输出
 * 换行与自动换行
 * GDT 初始化
+* IDT 初始化
+* 0~31 号 CPU 异常入口与基础处理
 * ISO 镜像生成
 * QEMU 启动支持
 
@@ -44,6 +46,8 @@ Image
 Bitmap Font
    ↓
 Console
+   ↓
+IDT / CPU Exception
 ```
 
 启动界面使用独立的图形背景、Logo 和标题文字，随后进入内核 Console。
@@ -54,8 +58,11 @@ Console
 MoonShardOS/
 ├── iso/                 # ISO 文件系统
 ├── limine/              # Limine 启动器子模块
+├── assets/
+│   └── logo.png         # Logo 源图片
 ├── src/
 │   ├── kernel.c         # 内核入口
+│   ├── logo.c            # 由 logo.png 生成的静态像素数组
 │   ├── graphics/
 │   │   ├── framebuffer.c
 │   │   ├── framebuffer.h
@@ -68,9 +75,15 @@ MoonShardOS/
 │   │   └── console.h
 │   └── cpu/
 │       ├── gdt.c
-│       └── gdt.h
+│       ├── gdt.h
+│       ├── idt.c
+│       ├── idt.h
+│       ├── isr.c
+│       └── isr.S
 ├── build.sh             # 构建脚本
+├── tools/png2c.py       # PNG 到 C 像素数组转换工具
 ├── linker.ld            # 内核链接脚本
+├── .gitignore
 └── .gitmodules
 ```
 
@@ -176,7 +189,7 @@ framebuffer_put_pixel()
 
 ## CPU
 
-当前已经加入基础 GDT。
+当前已经加入基础 GDT、IDT 和 CPU 异常处理。
 
 GDT 包含：
 
@@ -203,9 +216,15 @@ kmain()
 gdt_init()
    ↓
 framebuffer_init()
+   ↓
+console_init()
+   ↓
+idt_init()
 ```
 
-下一阶段将继续实现 IDT 和 CPU 异常处理。
+IDT 当前安装 CPU 保留的 `0~31` 号异常。`src/cpu/isr.S` 为没有错误码的异常补入 `0`，统一保存异常向量、错误码和通用寄存器，再调用 `src/cpu/isr.c` 中的 C 层处理函数。
+
+Page Fault 通过 `CR2` 读取触发异常的线性地址。当前异常处理器输出提示后停在 `hlt` 循环中；硬件中断、定时器和 TSS 尚未加入。
 
 ## 架构方向
 
@@ -260,6 +279,12 @@ qemu-system-x86_64 \
     -vga std
 ```
 
+Logo 源图片变更后，可以重新生成内核使用的像素数组：
+
+```bash
+python3 tools/png2c.py assets/logo.png src/logo.c
+```
+
 ## 路线图
 
 ### 启动与图形
@@ -286,8 +311,8 @@ qemu-system-x86_64 \
 ### CPU
 
 * [x] GDT
-* [ ] IDT
-* [ ] CPU 异常处理
+* [x] IDT
+* [x] CPU 异常处理
 * [ ] 中断处理
 * [ ] 定时器
 * [ ] TSS

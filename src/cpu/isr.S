@@ -3,6 +3,11 @@
 .extern isr_handler
 
 /*
+ * 这里是 x86-64 CPU 异常的汇编入口。
+ * 每个入口只负责补齐 vector/error code，然后跳转到公共路径；
+ * 公共路径再按 System V AMD64 ABI 保存寄存器、调用 C 处理器并恢复现场。
+ */
+/*
  * 导出 32 个 CPU 异常入口。
  */
 .global isr0
@@ -46,7 +51,9 @@
 .macro ISR_NO_ERROR number
 
 isr\number:
+    /* CPU 没有提供错误码，先补一个占位值。 */
     pushq $0
+    /* C 层需要知道实际异常向量。 */
     pushq $\number
     jmp isr_common
 
@@ -58,6 +65,7 @@ isr\number:
 .macro ISR_ERROR number
 
 isr\number:
+    /* 这类异常的错误码已经由 CPU 压栈，入口只需补 vector。 */
     pushq $\number
     jmp isr_common
 
@@ -126,10 +134,8 @@ isr_common:
     cli
 
     /*
-     * 保存全部通用寄存器。
-     *
-     * 保存顺序与 C 层 trap_frame_t
-     * 完全对应。
+     * 保存全部通用寄存器。由于 push 会递减 RSP，
+     * 最后压入的 r15 位于 C 结构体首字段，恢复时按相反顺序弹出。
      */
     pushq %rax
     pushq %rbx
@@ -164,10 +170,8 @@ isr_common:
     movq %rsp, %rbx
 
     /*
-     * 调整给 C 函数的栈。
-     *
-     * 无论异常发生前 RSP 是什么对齐状态，
-     * 这里都把调用前的 RSP 调整到 16 字节边界。
+     * 调整给 C 函数的栈。异常发生时 CPU 可能改变了原有对齐状态，
+     * 这里把调用前的 RSP 对齐到 16 字节边界，满足 ABI 的调用约定。
      */
     andq $-16, %rsp
 
@@ -205,12 +209,8 @@ isr_common:
     popq %rax
 
     /*
-     * 删除：
-     *
-     * vector number
-     * error code
-     *
-     * 总共 16 字节。
+     * 丢弃统一保存的 vector 和 error code，共 16 字节。
+     * CPU 自动保存的 RIP、CS、RFLAGS 仍由 iretq 从栈中取出。
      */
     addq $16, %rsp
 
@@ -218,3 +218,6 @@ isr_common:
      * 从 CPU 异常返回。
      */
     iretq
+
+/* ISR 不执行栈上的代码，向链接器声明无需可执行栈。 */
+.section .note.GNU-stack,"",@progbits

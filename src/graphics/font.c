@@ -1,6 +1,11 @@
 #include "font.h"
 #include "framebuffer.h"
 
+/*
+ * 字形表覆盖 ASCII 0x20~0x7E，共 95 个字符。
+ * 每一项包含 8 行，每行的最高位对应最左侧像素；位为 1 时写入前景色。
+ * 这种布局让字符码减去 0x20 后可以直接作为数组下标。
+ */
 static const uint8_t font[][FONT_HEIGHT] = {
     /* 0x20 ' ' */
     { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
@@ -297,6 +302,7 @@ void font_draw_char(
 {
     uint8_t c = (uint8_t)character;
 
+    /* 非 ASCII 可打印字符没有对应字形，统一显示问号。 */
     if (c < 0x20 || c > 0x7E)
     {
         c = '?';
@@ -305,6 +311,7 @@ void font_draw_char(
     const uint8_t *glyph =
         font[c - 0x20];
 
+    /* 逐行读取位图；空白位不写像素，因此保留原背景。 */
     for (uint64_t py = 0;
          py < FONT_HEIGHT;
          py++)
@@ -332,6 +339,7 @@ void font_draw_string(
     const char *text
 )
 {
+    /* 字符串不包含换行语义，调用者负责处理 Console 控制字符。 */
     while (*text)
     {
         font_draw_char(

@@ -3,6 +3,11 @@
 #include <stdint.h>
 
 /*
+ * IDT 负责把中断向量号映射到处理函数。
+ * 本文件只安装 CPU 保留的 0~31 号异常，硬件 IRQ 和软件中断仍未占用
+ * 其余向量，数组的静态存储期初始化会把它们保持为全零描述符。
+ */
+/*
  * x86-64 IDT 门描述符。
  *
  * 一个 IDT entry 占 16 字节。
@@ -171,6 +176,10 @@ static void idt_set_entry(
         (uint64_t)handler;
 
     /*
+     * 64 位处理函数地址在门描述符中分成三个字段，
+     * selector 指向 GDT 的内核代码段，CPU 进入处理函数时使用它。
+     */
+    /*
      * IDT 不会连续保存完整的 64 位地址，
      * 而是拆成低 16 位、中间 16 位和高 32 位。
      */
@@ -224,6 +233,7 @@ static void idt_load(void)
     idt_ptr.base =
         (uint64_t)&idt;
 
+    /* lidt 只读取 IDTR 伪描述符，不会复制 IDT 内容。 */
     /*
      * lidt 将 IDT 的位置告诉 CPU。
      */
@@ -260,6 +270,7 @@ void idt_init(void)
         );
     }
 
+    /* 完成加载后，CPU 才会按照这些门分派异常。 */
     /*
      * 把 IDT 地址加载到 CPU。
      */
